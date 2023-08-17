@@ -5,35 +5,39 @@ import { Edge } from '@/Types';
 // Creates an array of all edges in the schema view
 export default function createEdges(schemaObject: SchemaStore) {
   const edges: Edge[] = [];
-  for (const tableKey in schemaObject) {
-    const table = schemaObject[tableKey];
+ // Loop through each table in the schema object
+ for (let table in schemaObject) {
+  // Loop through each row in the table
+  for (let rowName in schemaObject[table]) {
+    const row = schemaObject[table][rowName];
 
-    for (const rowKey in table) {
-      const row = table[rowKey];
-
-      if (row.IsForeignKey) {
-        edges.push({
-          id: `${row.References[0].ReferencesPropertyName}-to-${row.References[0].PrimaryKeyName}`,
-          source: row.References[0].ReferencesTableName,
-          sourceHandle: row.References[0].ReferencesPropertyName,
-          target: row.References[0].PrimaryKeyTableName,
-          targetHandle: row.References[0].PrimaryKeyName,
-          animated: true,
-          label: row.References[0].constraintName,
-          style: {
+    // If the row is a foreign key and has a reference, create an edge
+    if (row.IsForeignKey && row.References && row.References.length > 0) {
+      edges.push({
+        id: `e${rowName}-${row.References[0].ReferencesPropertyName}`,
+        source: `${table}.${rowName}`,
+        sourceHandle: '',
+        target: `${row.References[0].ReferencesTableName}.${row.References[0].ReferencesPropertyName}`,
+        targetHandle: '',
+        animated: true,
+        arrowHeadType: 'arrowclosed',
+        label: row.References[0].constraintName,
+        style: {
             strokeWidth: 2,
             stroke: '#085c84',
-          },
-          markerEnd: {
+        },
+      
+        markerEnd: {
             type: 'arrowclosed',
             orient: 'auto',
             width: 20,
             height: 20,
             color: '#085c84',
-          },
-        });
-      };
-    };
-  };
-  return edges;
-};
+        },
+      });
+    }
+  }
+}
+
+return edges;
+}

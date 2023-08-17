@@ -50,16 +50,19 @@ const Sidebar = (props: any) => {
       const splitURI = fullLink.split('/');
       switch(splitURI[0]) {
         case ('mysql:'):
-          const mysqlName = splitURI[3].split('?');
-          const mysqlPort = splitURI[2].split(':')[2];
-          const internalLinkArray_mySQL = splitURI[2].split(':')[1].split('@');
-          values.hostname = internalLinkArray_mySQL[1];
-          values.username = splitURI[2].split(':')[0];
-          values.password = internalLinkArray_mySQL[0];
-          values.port = mysqlPort ? mysqlPort : '3306';
-          values.database_name = mysqlName[0];
-          values.db_type = 'mysql';
-          break;
+          // Updated MySQL parsing logic
+      // Extract the username and password
+      const [username, password] = splitURI[2].split('@')[0].split(':');
+      const [hostname, port] = splitURI[2].split('@')[1].split(':');
+      const databaseName = splitURI[3].split('?')[0];
+  
+      values.hostname = hostname;
+      values.username = username;
+      values.password = password;
+      values.port = port ? port : '3306'; // Default port for MySQL is 3306
+      values.database_name = databaseName;
+      values.db_type = 'mysql';
+      break;
         case ('mssql:'):
           const mssqlName = splitURI[3];
           const mssqlPort = splitURI[2].split(':')[2];
@@ -107,17 +110,26 @@ const Sidebar = (props: any) => {
     //change between which getSchema from MySQL to postgres based on db_type
 
     const dataFromBackend = await axios
-      .get(`api/sql/${values.db_type}/schema`, { params: values })
-      .then((res) => {
-        //console.log('data from back',res.data)
-        return res.data;
-      })
-      .catch((err: ErrorEvent) => console.error('getSchema error', err));
+    .get(`api/sql/${values.db_type}/schema`, { params: values })
+    .then((res) => {
+      return res.data;
+    })
+    .catch((err: ErrorEvent) => {
+      console.error('getSchema error', err);
+      return null; // Return null to indicate an error.
+    });
+  
+  if (dataFromBackend) {
     setSchemaStore(dataFromBackend.schema);
-    setDataStore(dataFromBackend.data)
+    setDataStore(dataFromBackend.data);
     setWelcome(false);
     setConnectPressed(false);
     props.closeNav();
+  } else {
+    console.error("Failed to retrieve data from backend");
+    // Optionally, display an error message to the user.
+    // This part is up to you, depending on how you handle user feedback in your application.
+  }
   };
   
   //on change for db type selection, will affect state to conditionally render database URL

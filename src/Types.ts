@@ -98,6 +98,7 @@ export type Edge = {
   target: string;
   targetHandle: string;
   animated: boolean;
+  arrowHeadType?: 'arrow' | 'arrowclosed' | string;
   label: string;
   style: { strokeWidth: number; stroke: string };
   markerEnd: {

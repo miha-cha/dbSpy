@@ -8,7 +8,12 @@ const mysqlController = {
 //----------Function to collect all schema and data from database-----------------------------------------------------------------
   mysqlQuery: async (req: Request, res: Response, next: NextFunction) => {
     const MysqlDataSource = await dbConnect(req);
-
+    try {
+      await MysqlDataSource.query('SELECT 1');
+      console.log('Connection to MySQL is successful');
+  } catch (err) {
+      console.error('Error establishing connection to MySQL:', err);
+  }
     /* 
     * Used for storing Primary Key table and column names that are
     *  part of Foreign Keys to adjust IsDestination to be true.
@@ -18,8 +23,10 @@ const mysqlController = {
 //--------HELPER FUNCTION 1-----------------------------------
     // function to query and get all information needed for foreign keys
     async function getForeignKeys(columnName: string, tableName: string): Promise<any[]> {
-      return await MysqlDataSource.query(mysqlForeignKeyQuery.replace('columnName', columnName).replace('tableName', tableName));
-  };
+      console.log('Executing query:', mysqlForeignKeyQuery);
+      return await MysqlDataSource.query(mysqlForeignKeyQuery, [columnName, tableName]);
+  }
+;
 
 //--------HELPER FUNCTION 2-----------------------------------
     // function organizing data from queries in to the desired format of the front end
@@ -85,55 +92,61 @@ const mysqlController = {
   };
 //--------HELPER FUNCTIONS END-----------------------------------
 
-    try {
-      // Query to retrieve all table names
-      const tables: any[] = await MysqlDataSource.query(`SHOW TABLES`);
-      //Declare constants to store results we get back from queries
-      const data: TableColumns = {};
-      const schema: TableSchema = {};
+try {
+  // Query to retrieve all table names
+  const query = `SHOW TABLES`;
+  console.log('Executing query:', query);
+  const tables: any[] = await MysqlDataSource.query(query);
 
-      //LOOP
-      for (const table of tables) {
-        const tableName: string = table[`Tables_in_${MysqlDataSource.options.database}`];
+  // Declare constants to store results we get back from queries
+  const data: TableColumns = {};
+  const schema: TableSchema = {};
 
-        // DATA Create property on tableData object with every loop
-        const tableData: {[key: string]: [] | {}[]} = await MysqlDataSource.query(`SELECT * FROM ${tableName}`);
-        data[`${MysqlDataSource.options.database}.${tableName}`] = tableData;
+  for (const table of tables) {
+      const tableName: string = table[`Tables_in_${MysqlDataSource.options.database}`];
 
-        // SCHEMA Create property on tableData object with every loop
-        const mysqlSchemaData: TableColumn[] = await MysqlDataSource.query(`DESCRIBE ${MysqlDataSource.options.database}.${tableName}`);
-        schema[`${MysqlDataSource.options.database}.${tableName}`] = await mysqlFormatTableSchema(mysqlSchemaData, tableName);
-      };
+      // Querying table data
+      const tableQuery = `SELECT * FROM ${tableName}`;  // No need to parameterize table names
+      console.log('Executing query:', tableQuery);
+      const tableData: {[key: string]: [] | {}[]} = await MysqlDataSource.query(tableQuery);
+      data[`${MysqlDataSource.options.database}.${tableName}`] = tableData;
 
-      // Changing the isDestination value for the Foreign Keys
-      if (foreignKeyReferenced.length !== 0) {
-        console.log('foreignKeyReferenced: ', foreignKeyReferenced)
-        for (const element of foreignKeyReferenced) {
-                console.log("schema data: ", schema);
-          console.log('schema[element.PrimaryKeyTableName][element.PrimaryKeyName]: ', schema[element.PrimaryKeyTableName][element.PrimaryKeyName])
-          schema[element.PrimaryKeyTableName][element.PrimaryKeyName].References!.push(element)
-        };
-      };
+      // Querying schema data
+      const schemaQuery = `DESCRIBE ${MysqlDataSource.options.database}.${tableName}`;  // No need to parameterize table names
+      console.log('Executing query:', schemaQuery);
+      const mysqlSchemaData: TableColumn[] = await MysqlDataSource.query(schemaQuery);
+      schema[`${MysqlDataSource.options.database}.${tableName}`] = await mysqlFormatTableSchema(mysqlSchemaData, tableName);
+  }
 
-      // Console.logs to check what the data looks like
-      // console.log("table data: ", data);
-      // console.log("schema data: ", schema);
+  // Changing the isDestination value for the Foreign Keys
+  if (foreignKeyReferenced.length !== 0) {
+      console.log('foreignKeyReferenced: ', foreignKeyReferenced);
+      for (const element of foreignKeyReferenced) {
+          console.log("schema data: ", schema);
+          console.log('schema[element.PrimaryKeyTableName][element.PrimaryKeyName]: ', schema[element.PrimaryKeyTableName][element.PrimaryKeyName]);
+          schema[element.PrimaryKeyTableName][element.PrimaryKeyName].References!.push(element);
+      }
+  }
 
-      // Storage of queried results into res.locals
-      res.locals.schema = schema;
-      res.locals.data = data;
-      
-      // Disconnecting after data has been received 
-      MysqlDataSource.destroy();
-      console.log('Database has been disconnected');
-      return next();
+  // Console logs to check what the data looks like
+  // console.log("table data: ", data);
+  // console.log("schema data: ", schema);
 
-    } catch (err: unknown) {
-      console.log('Error during Data Source: ', err);
-      MysqlDataSource.destroy();
-      console.log('Database has been disconnected');
-      return next(err);
-    };
+  // Storage of queried results into res.locals
+  res.locals.schema = schema;
+  res.locals.data = data;
+
+  // Disconnecting after data has been received 
+  MysqlDataSource.destroy();
+  console.log('Database has been disconnected');
+  return next();
+
+} catch (err: unknown) {
+  console.log('Error during Data Source: ', err);
+  MysqlDataSource.destroy();
+  console.log('Database has been disconnected');
+  return next(err);
+}
   },
 
 //-------------------------------------DATA TABLE ROWS-------------------------------------------------
